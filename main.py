@@ -33,7 +33,6 @@ ANIMATED_VIDEO = OUTPUT_DIR / "animated.mp4"
 VIDEO_WITH_SUBS = OUTPUT_DIR / "video_with_subs.mp4"
 FINAL_VIDEO = OUTPUT_DIR / "final_video.mp4"
 
-WHISPER_MODEL_NAME = "small"
 
 # ----------------------------------------
 
@@ -207,37 +206,50 @@ def generate_tts(story: str):
     print(f"[tts] Narration saved to {NARRATION_FILE}")
 
 def generate_word_subtitles():
-    """Generate WORD-BY-WORD subtitles using Vosk (lightweight!)."""
+    """Generate WORD-BY-WORD Greek subtitles using Vosk speech recognition."""
     print("[subs] Generating word-level Greek subtitles with Vosk...")
     
     import json
     import wave
-    from vosk import Model, KaldiRecognizer
-    import os
+    try:
+        from vosk import Model, KaldiRecognizer
+    except ImportError:
+        print("[subs] Installing vosk...")
+        subprocess.run(["pip", "install", "vosk"], check=True)
+        from vosk import Model, KaldiRecognizer
     
-    # Download Vosk model if not exists
+    # Download Vosk Greek model if not exists
     model_path = "vosk-model-el-gr-0.7"
     if not os.path.exists(model_path):
-        print("[subs] Downloading Vosk Greek model (~45 MB)...")
+        print("[subs] Downloading Vosk Greek model (~150 MB)...")
         import urllib.request
         import zipfile
         
         url = "https://alphacephei.com/vosk/models/vosk-model-el-gr-0.7.zip"
         zip_path = "vosk-model.zip"
         
-        urllib.request.urlretrieve(url, zip_path)
-        
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(".")
-        
-        os.remove(zip_path)
-        print("[subs] Model downloaded!")
+        try:
+            urllib.request.urlretrieve(url, zip_path)
+            
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(".")
+            
+            os.remove(zip_path)
+            print("[subs] Greek model downloaded successfully!")
+        except Exception as e:
+            print(f"[subs] Error downloading model: {e}")
+            raise
     
-    # Convert MP3 to WAV for Vosk
+    # Convert MP3 to WAV for Vosk (16kHz mono required)
     wav_file = "output/narration.wav"
-    os.system(f'ffmpeg -y -i {NARRATION_FILE} -ar 16000 -ac 1 {wav_file}')
+    print("[subs] Converting audio to WAV format...")
+    subprocess.run([
+        'ffmpeg', '-y', '-i', str(NARRATION_FILE), 
+        '-ar', '16000', '-ac', '1', wav_file
+    ], check=True, capture_output=True)
     
-    # Load Vosk model
+    # Load Vosk Greek model
+    print("[subs] Loading Vosk Greek model...")
     model = Model(model_path)
     
     # Open WAV file
@@ -245,7 +257,8 @@ def generate_word_subtitles():
     rec = KaldiRecognizer(model, wf.getframerate())
     rec.SetWords(True)  # Enable word-level timestamps
     
-    # Process audio
+    # Process audio and extract words with timestamps
+    print("[subs] Transcribing Greek audio...")
     words = []
     while True:
         data = wf.readframes(4000)
@@ -261,7 +274,7 @@ def generate_word_subtitles():
                         'end': word_info['end']
                     })
     
-    # Final result
+    # Get final result
     final_result = json.loads(rec.FinalResult())
     if 'result' in final_result:
         for word_info in final_result['result']:
@@ -270,6 +283,9 @@ def generate_word_subtitles():
                 'start': word_info['start'],
                 'end': word_info['end']
             })
+    
+    wf.close()
+    print(f"[subs] Transcribed {len(words)} Greek words with accurate timing")
     
     # Create ASS subtitle file
     ass_content = """[Script Info]
