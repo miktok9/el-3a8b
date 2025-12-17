@@ -2,7 +2,7 @@ name: Daily Auto Shorts with YouTube Upload
 
 on:
   schedule:
-    - cron: "00 14 * * *"     # 7:00 PM IST (13:30 UTC)
+    - cron: "30 13 * * *"     # 7:00 PM IST (13:30 UTC)
   workflow_dispatch:
 
 jobs:
@@ -24,11 +24,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y ffmpeg
 
-    - name: Cache Vosk Model
+    - name: Cache Vosk Greek Model
       uses: actions/cache@v3
       with:
-        path: vosk-model-small-el-gr-0.3
-        key: vosk-el-model-${{ runner.os }}
+        path: vosk-model-el-gr-0.7
+        key: vosk-greek-model-0.7-${{ runner.os }}
 
     - name: Install dependencies
       run: |
