@@ -21,6 +21,7 @@ from upload_tiktok import upload_to_tiktok
 from upload_facebook import upload_to_facebook
 from upload_threads import upload_to_threads
 from upload_twitter import upload_to_twitter
+from upload_vk import upload_to_vk
 
 def main():
     """Upload video to all configured platforms."""
@@ -40,12 +41,16 @@ def main():
     else:
         title = f"Ιστορία των Γυναικών στην Αρχαιότητα - {datetime.date.today()}"
     
-    # Greek description - topic-relevant, no AI mentions
-    description = f"""Ανακαλύψτε τη συναρπαστική ιστορία των γυναικών στους αρχαίους πολιτισμούς.
-
-Εξερευνήστε τους νόμους, τα έθιμα, τις παραδόσεις και τις θρυλικές προσωπικότητες που διαμόρφωσαν την ιστορία.
-
-#Shorts #ΙστορίαΓυναικών #ΑρχαίαΙστορία #Εκπαίδευση"""
+    # Platform-specific content
+    descriptions = {
+        'youtube': f"{story[:150] if len(story) > 150 else story} #ΙστορίαΓυναικών #ΑρχαίαΙστορία #Ιστορία #Εκπαίδευση",
+        'instagram': f"{story[:2200] if len(story) > 2200 else story}\n\n#ΙστορίαΓυναικών #ΑρχαίαΙστορία #Ιστορία #Εκπαίδευση #Shorts #Reels",
+        'tiktok': f"{story[:2200] if len(story) > 2200 else story} #ΙστορίαΓυναικών #ΑρχαίαΙστορία #Ιστορία #Εκπαίδευση #FYP",
+        'facebook': f"{story[:63206] if len(story) > 63206 else story}\n\n#ΙστορίαΓυναικών #ΑρχαίαΙστορία #Ιστορία #Εκπαίδευση",
+        'threads': f"{story[:500] if len(story) > 500 else story} #ΙστορίαΓυναικών #ΑρχαίαΙστορία #Ιστορία #Εκπαίδευση",
+        'twitter': f"{story[:280] if len(story) > 280 else story} #ΙστορίαΓυναικών #ΑρχαίαΙστορία #Ιστορία",
+        'vk': f"{story[:220] if len(story) > 220 else story}\n\n#ΙστορίαΓυναικών #ΑρχαίαΙστορία #Ιστορία #Εκπαίδευση"
+    }
     
     tags = [
         'Ιστορία', 'Αρχαίες Γυναίκες', 'Ιστορικά Γεγονότα',
@@ -64,7 +69,7 @@ def main():
         print("📺 Uploading to YouTube...")
         print("="*60)
         try:
-            result = upload_to_youtube(video_file, title, description, tags)
+            result = upload_to_youtube(video_file, title, descriptions['youtube'], tags)
             results['youtube'] = result
             print(f"✅ YouTube: https://youtube.com/shorts/{result['id']}")
         except Exception as e:
@@ -82,7 +87,7 @@ def main():
         print("📸 Uploading to Instagram...")
         print("="*60)
         try:
-            result = upload_to_instagram(video_file, description)
+            result = upload_to_instagram(str(video_file), descriptions['instagram'])
             results['instagram'] = result
             print(f"✅ Instagram: Uploaded successfully")
         except Exception as e:
@@ -97,7 +102,7 @@ def main():
         print("🎵 Uploading to TikTok...")
         print("="*60)
         try:
-            result = upload_to_tiktok(video_file, title, description)
+            result = upload_to_tiktok(video_file, title, descriptions['tiktok'])
             results['tiktok'] = result
             print(f"✅ TikTok: Uploaded successfully")
         except Exception as e:
@@ -115,7 +120,7 @@ def main():
         print("📘 Uploading to Facebook...")
         print("="*60)
         try:
-            result = upload_to_facebook(video_file, description)
+            result = upload_to_facebook(video_file, descriptions['facebook'])
             results['facebook'] = result
             print(f"✅ Facebook: Uploaded successfully")
         except Exception as e:
@@ -133,7 +138,7 @@ def main():
         print("🧵 Uploading to Threads...")
         print("="*60)
         try:
-            result = upload_to_threads(video_file, description)
+            result = upload_to_threads(str(video_file), descriptions['threads'])
             results['threads'] = result
             print(f"✅ Threads: Uploaded successfully")
         except Exception as e:
@@ -153,7 +158,7 @@ def main():
         print("🐦 Uploading to Twitter/X...")
         print("="*60)
         try:
-            result = upload_to_twitter(video_file, description)
+            result = upload_to_twitter(video_file, descriptions['twitter'])
             results['twitter'] = result
             print(f"✅ Twitter: Uploaded successfully")
         except Exception as e:
@@ -162,13 +167,39 @@ def main():
     else:
         print("⏭️  Skipping Twitter (credentials not set)")
     
+    # Upload to VK
+    if all([
+        os.getenv('VK_ACCESS_TOKEN'),
+        os.getenv('VK_GROUP_ID')
+    ]):
+        print("\n" + "="*60)
+        print("🇷🇺 Uploading to VK...")
+        print("="*60)
+        try:
+            result = upload_to_vk(str(video_file), descriptions['vk'], title)
+            results['vk'] = result
+            print(f"✅ VK: Uploaded successfully")
+        except Exception as e:
+            print(f"❌ VK failed: {e}")
+            results['vk'] = None
+    else:
+        print("⏭️  Skipping VK (credentials not set)")
+    
     # Summary
     print("\n" + "="*60)
     print("📊 Upload Summary")
     print("="*60)
+    success_count = 0
+    total_count = len(results)
     for platform, result in results.items():
-        status = "✅ Success" if result else "❌ Failed"
+        if result:
+            status = "✅ Success"
+            success_count += 1
+        else:
+            status = "❌ Failed"
         print(f"{platform.capitalize()}: {status}")
+    print("="*60)
+    print(f"Success Rate: {success_count}/{total_count} platforms")
     print("="*60)
 
 if __name__ == '__main__':

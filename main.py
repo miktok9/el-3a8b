@@ -7,6 +7,10 @@ from pathlib import Path
 from urllib.parse import quote
 import requests
 import time
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ---------------- CONFIG ----------------
 
@@ -33,6 +37,7 @@ ANIMATED_VIDEO = OUTPUT_DIR / "animated.mp4"
 VIDEO_WITH_SUBS = OUTPUT_DIR / "video_with_subs.mp4"
 FINAL_VIDEO = OUTPUT_DIR / "final_video.mp4"
 
+WHISPER_MODEL_NAME = "small"
 
 # ----------------------------------------
 
@@ -51,8 +56,12 @@ def choose_topic_for_today():
     return topics[today.toordinal() % len(topics)]
 
 def generate_story_with_pollinations(topic: str) -> str:
-    """Generate a short Greek story about ancient women's history."""
-    base_url = "https://text.pollinations.ai/"
+    """Generate a short Greek story about ancient women's history using paid Pollinations API."""
+    
+    api_key = os.getenv("POLLINATIONS_API_KEY")
+    if not api_key:
+        raise ValueError("POLLINATIONS_API_KEY environment variable is required for paid API")
+
     system = (
         "Είσαι ιστορικός ειδικευμένος στην ιστορία των γυναικών στους αρχαίους πολιτισμούς. "
         "Γράψε μια σύντομη, ενδιαφέρουσα ιστορία 30 δευτερολέπτων (80-130 λέξεις) στα ελληνικά. "
@@ -61,11 +70,17 @@ def generate_story_with_pollinations(topic: str) -> str:
     )
     prompt = f"Θέμα: {topic}. Διηγήσου ένα ενδιαφέρον ιστορικό γεγονός."
 
-    url = base_url + quote(prompt)
-    params = {"model": "openai", "temperature": 1.0, "system": system}
-
+    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = {
+        "model": "nova-fast",
+        "temperature": 1.0,
+        "system": system,
+        "json": False
+    }
+    
     print(f"[story] Generating Greek story for topic: {topic}")
-    r = requests.get(url, params=params, timeout=60)
+    r = requests.get(url, headers=headers, params=params, timeout=120)
     r.raise_for_status()
     text = r.text.strip()
 
@@ -206,50 +221,37 @@ def generate_tts(story: str):
     print(f"[tts] Narration saved to {NARRATION_FILE}")
 
 def generate_word_subtitles():
-    """Generate WORD-BY-WORD Greek subtitles using Vosk speech recognition."""
+    """Generate WORD-BY-WORD subtitles using Vosk (lightweight!)."""
     print("[subs] Generating word-level Greek subtitles with Vosk...")
     
     import json
     import wave
-    try:
-        from vosk import Model, KaldiRecognizer
-    except ImportError:
-        print("[subs] Installing vosk...")
-        subprocess.run(["pip", "install", "vosk"], check=True)
-        from vosk import Model, KaldiRecognizer
+    from vosk import Model, KaldiRecognizer
+    import os
     
-    # Download Vosk Greek model if not exists
-    model_path = "vosk-model-el-gr-0.7"
+    # Download Vosk model if not exists
+    model_path = "vosk-model-small-el-gr-0.3"
     if not os.path.exists(model_path):
-        print("[subs] Downloading Vosk Greek model (~150 MB)...")
+        print("[subs] Downloading Vosk Greek model (~45 MB)...")
         import urllib.request
         import zipfile
         
-        url = "https://alphacephei.com/vosk/models/vosk-model-el-gr-0.7.zip"
+        url = "https://alphacephei.com/vosk/models/vosk-model-small-el-gr-0.3.zip"
         zip_path = "vosk-model.zip"
         
-        try:
-            urllib.request.urlretrieve(url, zip_path)
-            
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(".")
-            
-            os.remove(zip_path)
-            print("[subs] Greek model downloaded successfully!")
-        except Exception as e:
-            print(f"[subs] Error downloading model: {e}")
-            raise
+        urllib.request.urlretrieve(url, zip_path)
+        
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(".")
+        
+        os.remove(zip_path)
+        print("[subs] Model downloaded!")
     
-    # Convert MP3 to WAV for Vosk (16kHz mono required)
+    # Convert MP3 to WAV for Vosk
     wav_file = "output/narration.wav"
-    print("[subs] Converting audio to WAV format...")
-    subprocess.run([
-        'ffmpeg', '-y', '-i', str(NARRATION_FILE), 
-        '-ar', '16000', '-ac', '1', wav_file
-    ], check=True, capture_output=True)
+    os.system(f'ffmpeg -y -i {NARRATION_FILE} -ar 16000 -ac 1 {wav_file}')
     
-    # Load Vosk Greek model
-    print("[subs] Loading Vosk Greek model...")
+    # Load Vosk model
     model = Model(model_path)
     
     # Open WAV file
@@ -257,8 +259,7 @@ def generate_word_subtitles():
     rec = KaldiRecognizer(model, wf.getframerate())
     rec.SetWords(True)  # Enable word-level timestamps
     
-    # Process audio and extract words with timestamps
-    print("[subs] Transcribing Greek audio...")
+    # Process audio
     words = []
     while True:
         data = wf.readframes(4000)
@@ -274,7 +275,7 @@ def generate_word_subtitles():
                         'end': word_info['end']
                     })
     
-    # Get final result
+    # Final result
     final_result = json.loads(rec.FinalResult())
     if 'result' in final_result:
         for word_info in final_result['result']:
@@ -283,9 +284,6 @@ def generate_word_subtitles():
                 'start': word_info['start'],
                 'end': word_info['end']
             })
-    
-    wf.close()
-    print(f"[subs] Transcribed {len(words)} Greek words with accurate timing")
     
     # Create ASS subtitle file
     ass_content = """[Script Info]
