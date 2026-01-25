@@ -146,9 +146,9 @@ def main():
         story = story_file.read_text(encoding='utf-8')
         # Create short caption for Twitter
         first_sentence = story.split('.')[0] if '.' in story else story[:200]
-        caption = f"{first_sentence}... 🏛️\n\n#Ιστορία #ΑρχαίεςΓυναίκες #ΕλληνικήΙστορία #Εκπαίδευση"
+        caption = f"{first_sentence}... 🏛️\n\n#ΚορίτσιΤύπου #Ψυχολογία #Εμπνευσμός #Στοιχεία #Eğitim"
     else:
-        caption = "Ιστορία αρχαίων γυναικών 🏛️ #Ιστορία #ΑρχαίεςΓυναίκες #ΕλληνικήΙστορία #Εκπαίδευση"
+        caption = "Ιστορία αρχαίων γυναικών 🏛️ #ΚορίτσιΤύπου #Ψυχολογία #Εμπνευσμός #Στοιχεία #Eğitim"
 
     try:
         result = upload_to_twitter(str(video_file), caption)

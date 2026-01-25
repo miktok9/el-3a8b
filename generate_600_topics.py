@@ -1,5 +1,5 @@
 """
-Generate 600 Portuguese topics about ancient women's history.
+Generate 600 Greek topics about ancient women's history.
 """
 
 import requests
@@ -7,26 +7,26 @@ from urllib.parse import quote
 from pathlib import Path
 import time
 
-def generate_french_topics_batch(batch_num, count=100):
-    """Generate a batch of Portuguese topics."""
+def generate_greek_topics_batch(batch_num, count=100):
+    """Generate a batch of Greek topics."""
     
     base_url = "https://text.pollinations.ai/"
     
     # Simpler system prompt
     system = (
-        "You are a historian specialized in ancient women's history. "
-        f"Create {count} unique topics in Portuguese about women in ancient civilizations. "
-        "Each topic should be 5-10 words, interesting and educational. "
-        "Cover: laws, customs, famous women, professions, religion, culture, art. "
-        "Output ONLY the topics, one per line, no numbers or bullets."
+        "Είσαι ιστορικός που ειδικεύεται στην ιστορία των γυναικών στους αρχαίους πολιτισμούς. "
+        f"Δημιούργησε {count} μοναδικά θέματα στα ελληνικά για γυναίκες σε αρχαίους πολιτισμούς. "
+        "Κάθε θέμα πρέπει να είναι 5-10 λέξεις, ενδιαφέρον και εκπαιδευτικό. "
+        "Καλύπτει: νόμους, έθιμα, διάσημες γυναίκες, επαγγέλματα, θρησκεία, πολιτισμό, τέχνη. "
+        "Εξάγει ΜΟΝΟ τα θέματα, ένα ανά γραμμή, χωρίς αριθμούς ή κουκκίδες."
     )
     
-    prompt = f"Generate {count} unique Portuguese topics about women in ancient civilizations"
+    prompt = f"Δημιούργησε {count} μοναδικά ελληνικά θέματα για γυναίκες σε αρχαίους πολιτισμούς"
     
     url = base_url + quote(prompt)
     params = {"model": "openai", "temperature": 0.9, "system": system}
     
-    print(f"[batch {batch_num}] Generating {count} Portuguese topics...")
+    print(f"[batch {batch_num}] Generating {count} Greek topics...")
     
     try:
         r = requests.get(url, params=params, timeout=120)
@@ -55,13 +55,13 @@ def generate_french_topics_batch(batch_num, count=100):
         return []
 
 def main():
-    """Generate 600 Portuguese topics in batches."""
+    """Generate 600 Greek topics in batches."""
     
     all_topics = []
     batches = 6  # 6 batches of 100 = 600 topics
     
     for i in range(batches):
-        topics = generate_french_topics_batch(i+1, 100)
+        topics = generate_greek_topics_batch(i+1, 100)
         all_topics.extend(topics)
         
         print(f"[progress] Total topics so far: {len(all_topics)}")
@@ -77,7 +77,7 @@ def main():
         for topic in all_topics:
             f.write(f"{topic}\n")
     
-    print(f"\n[done] Generated {len(all_topics)} Portuguese topics!")
+    print(f"\n[done] Generated {len(all_topics)} Greek topics!")
     print(f"[done] Saved to {topics_file}")
 
 if __name__ == '__main__':

@@ -97,13 +97,13 @@ def upload_to_facebook(video_path, description):
             post_params = {
                 'access_token': access_token,
                 'description': description_limited,
-                'title': 'Ιστορία των αρχαίων γυναικών',
+                'title': 'Ιστορία αρχαίων γυναικών',
                 'file_url': video_url,  # Use file_url instead of uploading file directly
                 'published': True
             }
 
             print(f"[facebook] Request URL: {post_url}")
-            print(f"[facebook] Parameters: title='Ιστορία των αρχαίων γυναικών', file_url={video_url[:50]}..., description length={len(description_limited)}")
+            print(f"[facebook] Parameters: title='Ιστορία αρχαίων γυναικών', file_url={video_url[:50]}..., description length={len(description_limited)}")
 
             post_response = requests.post(post_url, params=post_params, timeout=60)
 
@@ -166,7 +166,7 @@ def main():
     if story_file.exists():
         description = story_file.read_text(encoding='utf-8')[:63206]  # Facebook description limit
     else:
-        description = "Ιστορία των αρχαίων γυναικών 🏛️ #ΙστορίαΓυναικών #ΑρχαίαΙστορία #Ιστορία #Εκπαίδευση"
+        description = "Ιστορία αρχαίων γυναικών 🏛️ #ΚορίτσιΤύπου #Ψυχολογία #Εμπνευσμός #Στοιχεία #Eğitim"
 
     try:
         result = upload_to_facebook(str(video_file), description)

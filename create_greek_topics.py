@@ -10,24 +10,39 @@ import time
 def generate_greek_topics_batch(batch_num, batch_size=25):
     """Generate a batch of Greek topics."""
     
-    base_url = "https://text.pollinations.ai/"
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
     
-    # Simpler, more direct prompt in English for better results
-    prompt = (
-        f"Write {batch_size} different topics about women in ancient civilizations. "
-        f"Each topic should be in Greek language. "
-        f"Examples: 'Οι Σπαρτιάτισσες και η εκπαίδευσή τους', "
-        f"'Η Κλεοπάτρα της Αιγύπτου', 'Οι γυναίκες φιλόσοφοι στην Αθήνα'. "
-        f"Write {batch_size} similar topics in Greek, one per line, no numbers."
+    api_key = os.getenv("POLLINATIONS_API_KEY")
+    if not api_key:
+        raise ValueError("POLLINATIONS_API_KEY environment variable is required for paid API")
+    
+    # System prompt for Greek topics
+    system = (
+        "Είσαι ιστορικός που ειδικεύεται στην ιστορία των γυναικών στους αρχαίους πολιτισμούς. "
+        f"Δημιούργησε {batch_size} μοναδικά θέματα στα ελληνικά για γυναίκες σε αρχαίους πολιτισμούς. "
+        "Κάθε θέμα πρέπει να είναι 5-10 λέξεις, ενδιαφέρον και εκπαιδευτικό. "
+        "Καλύπτει: νόμους, έθιμα, διάσημες γυναίκες, επαγγέλματα, θρησκεία, πολιτισμό, τέχνη. "
+        "Εξάγει ΜΟΝΟ τα θέματα, ένα ανά γραμμή, χωρίς αριθμούς ή κουκκίδες."
     )
     
-    url = base_url + quote(prompt)
+    prompt = f"Δημιούργησε {batch_size} μοναδικά ελληνικά θέματα για γυναίκες σε αρχαίους πολιτισμούς"
+    
+    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = {
+        "model": "nova-fast",
+        "temperature": 0.9,
+        "system": system,
+        "json": False
+    }
     
     max_retries = 3
     for retry in range(max_retries):
         try:
             print(f"  Batch {batch_num}: Requesting {batch_size} topics... (attempt {retry + 1})")
-            r = requests.get(url, timeout=120)
+            r = requests.get(url, headers=headers, params=params, timeout=120)
             r.raise_for_status()
             
             text = r.text.strip()

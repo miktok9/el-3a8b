@@ -211,8 +211,8 @@ def main():
         return
 
     # Test parameters
-    title = "Ιστορία των αρχαίων γυναικών"
-    description = "Μάθετε για τις σπουδαίες γυναίκες του αρχαίου κόσμου #ΙστορίαΓυναικών #ΑρχαίαΙστορία"
+    title = "Ιστορία αρχαίων γυναικών"
+    description = "Μάθετε για τις σπουδαίες γυναίκες του αρχαίου κόσμου #ΚορίτσιΤύπου #Ψυχολογία"
 
     try:
         result = upload_to_tiktok(str(video_file), title, description)
