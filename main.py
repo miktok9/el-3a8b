@@ -240,9 +240,36 @@ def generate_word_subtitles():
     import os
     
     # Check if we're running in a GitHub Actions environment
-    import os
     is_github_actions = os.getenv('GITHUB_ACTIONS') == 'true'
     
+    # Check if narration file exists before proceeding
+    if not NARRATION_FILE.exists():
+        print(f"[subs] ERROR: Narration file not found: {NARRATION_FILE}")
+        print("[subs] Creating fallback subtitles...")
+        
+        # Create a basic ASS file as fallback
+        ass_content = """[Script Info]
+Title: Greek Story
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial Black,16,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,5,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,0,,ΔΟΚΙΜΗ ΓΙΑ ΕΛΛΗΝΙΚΟ ΥΠΟΤΙΤΛΟ
+Dialogue: 0,0:00:03.00,0:00:06.00,Default,,0,0,0,,ΥΠΟΤΙΤΛΟΣ ΔΕΝ ΔΗΜΙΟΥΡΓΗΘΗΚΕ ΣΩΣΤΑ
+Dialogue: 0,0:00:06.00,0:00:09.00,Default,,0,0,0,,ΕΛΕΓΞΤΕ ΤΗΝ ΔΙΑΔΙΚΑΣΙΑ ΠΑΡΑΓΩΓΗΣ
+"""
+        
+        with open(SUBS_FILE, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+        
+        print(f"[subs] Fallback subtitle file created with error message")
+        return
+    
+    # Check if we're in GitHub Actions
     if is_github_actions:
         print("[subs] Running in GitHub Actions - skipping large Greek model download")
         print("[subs] Creating basic subtitles without word-level timing...")
@@ -299,61 +326,206 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         print(f"[subs] Basic subtitles created for GitHub Actions ({len(words)} segments)")
         return
     
-    # Download Vosk model if not exists (only for local runs)
+    # Verify that the Greek model exists
     model_path = "vosk-model-el-gr-0.7"
     if not os.path.exists(model_path):
-        print("[subs] Downloading Vosk Greek model (~1.1 GB, this may take a while)...")
-        import urllib.request
-        import zipfile
+        print(f"[subs] ERROR: Greek Vosk model not found at {model_path}")
+        print("[subs] Please ensure the vosk-model-el-gr-0.7 directory exists")
         
-        url = "https://alphacephei.com/vosk/models/vosk-model-el-gr-0.7.zip"
-        zip_path = "vosk-model.zip"
+        # Create a basic ASS file as fallback
+        ass_content = """[Script Info]
+Title: Greek Story
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial Black,16,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,5,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,0,,ΕΛΛΗΝΙΚΟ ΜΟΝΤΕΛΟ VOSK ΔΕΝ ΒΡΕΘΗΚΕ
+Dialogue: 0,0:00:03.00,0:00:06.00,Default,,0,0,0,,ΚΑΤΕΒΑΣΤΕ ΤΟ ΜΟΝΤΕΛΟ ΚΑΙ ΔΟΚΙΜΑΣΤΕ ΞΑΝΑ
+Dialogue: 0,0:00:06.00,0:00:09.00,Default,,0,0,0,,ΕΛΛΗΝΙΚΟΙ ΥΠΟΤΙΤΛΟΙ ΑΠΕΤΥΧΑΝ
+"""
         
-        urllib.request.urlretrieve(url, zip_path)
+        with open(SUBS_FILE, "w", encoding="utf-8") as f:
+            f.write(ass_content)
         
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(".")
-        
-        os.remove(zip_path)
-        print("[subs] Model downloaded!")
+        print(f"[subs] Error subtitle file created - Greek model not found")
+        return
     
-    # Convert MP3 to WAV for Vosk
-    wav_file = "output/narration.wav"
-    os.system(f'ffmpeg -y -i {NARRATION_FILE} -ar 16000 -ac 1 {wav_file}')
+    # Convert MP3 to WAV for Vosk (using subprocess for better error handling)
+    import subprocess
+    wav_file = OUTPUT_DIR / "narration.wav"
+    
+    try:
+        result = subprocess.run([
+            "ffmpeg", "-y", 
+            "-i", str(NARRATION_FILE),
+            "-ar", "16000", 
+            "-ac", "1", 
+            str(wav_file)
+        ], capture_output=True, text=True, check=True)
+        print("[subs] Successfully converted MP3 to WAV for Vosk processing")
+    except subprocess.CalledProcessError as e:
+        print(f"[subs] ERROR: FFmpeg conversion failed: {e}")
+        print(f"[subs] FFmpeg stderr: {e.stderr}")
+        
+        # Create a basic ASS file as fallback
+        ass_content = """[Script Info]
+Title: Greek Story
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial Black,16,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,5,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,0,,FFMPEG ΜΕΤΑΤΡΟΠΗ ΑΠΕΤΥΧΕ
+Dialogue: 0,0:00:03.00,0:00:06.00,Default,,0,0,0,,ΕΛΕΓΞΤΕ ΤΟ FFMPEG ΚΑΙ ΤΟ ΑΡΧΕΙΟ ΗΧΟΥ
+Dialogue: 0,0:00:06.00,0:00:09.00,Default,,0,0,0,,ΥΠΟΤΙΤΛΟΙ ΔΕΝ ΔΗΜΙΟΥΡΓΗΘΗΚΑΝ
+"""
+        
+        with open(SUBS_FILE, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+        
+        print(f"[subs] Error subtitle file created - FFmpeg conversion failed")
+        return
+    except FileNotFoundError:
+        print("[subs] ERROR: FFmpeg not found. Please install FFmpeg.")
+        
+        # Create a basic ASS file as fallback
+        ass_content = """[Script Info]
+Title: Greek Story
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial Black,16,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,5,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,0,,FFMPEG ΔΕΝ ΕΙΝΑΙ ΕΓΚΑΤΕΣΤΗΜΕΝΟ
+Dialogue: 0,0:00:03.00,0:00:06.00,Default,,0,0,0,,ΕΓΚΑΤΑΣΤΗΣΤΕ ΤΟ FFMPEG ΓΙΑ ΥΠΟΤΙΤΛΟΥΣ
+Dialogue: 0,0:00:06.00,0:00:09.00,Default,,0,0,0,,ΕΛΛΗΝΙΚΟΙ ΥΠΟΤΙΤΛΟΙ ΑΠΕΤΥΧΑΝ
+"""
+        
+        with open(SUBS_FILE, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+        
+        print(f"[subs] Error subtitle file created - FFmpeg not found")
+        return
     
     # Load Vosk model
-    model = Model(model_path)
+    try:
+        model = Model(model_path)
+        print("[subs] Loaded Greek Vosk model successfully")
+    except Exception as e:
+        print(f"[subs] ERROR: Failed to load Vosk model: {e}")
+        
+        # Create a basic ASS file as fallback
+        ass_content = """[Script Info]
+Title: Greek Story
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial Black,16,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,5,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,0,,ΦΟΡΤΩΣΗ ΜΟΝΤΕΛΟΥ VOSK ΑΠΕΤΥΧΕ
+Dialogue: 0,0:00:03.00,0:00:06.00,Default,,0,0,0,,ΕΛΕΓΞΤΕ ΤΟ ΕΛΛΗΝΙΚΟ ΜΟΝΤΕΛΟ
+Dialogue: 0,0:00:06.00,0:00:09.00,Default,,0,0,0,,ΥΠΟΤΙΤΛΟΙ ΔΕΝ ΔΗΜΙΟΥΡΓΗΘΗΚΑΝ
+"""
+        
+        with open(SUBS_FILE, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+        
+        return
     
     # Open WAV file
-    wf = wave.open(wav_file, "rb")
-    rec = KaldiRecognizer(model, wf.getframerate())
-    rec.SetWords(True)  # Enable word-level timestamps
+    try:
+        wf = wave.open(str(wav_file), "rb")
+        rec = KaldiRecognizer(model, wf.getframerate())
+        rec.SetWords(True)  # Enable word-level timestamps
+        print("[subs] Initialized Vosk recognizer for Greek audio processing")
+    except Exception as e:
+        print(f"[subs] ERROR: Failed to initialize Vosk recognizer: {e}")
+        
+        # Create a basic ASS file as fallback
+        ass_content = """[Script Info]
+Title: Greek Story
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial Black,16,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,5,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,0,,ΕΠΕΞΕΡΓΑΣΙΑ ΗΧΟΥ VOSK ΑΠΕΤΥΧΕ
+Dialogue: 0,0:00:03.00,0:00:06.00,Default,,0,0,0,,ΕΛΕΓΞΤΕ ΤΟ ΑΡΧΕΙΟ ΗΧΟΥ ΚΑΙ ΜΟΝΤΕΛΟ
+Dialogue: 0,0:00:06.00,0:00:09.00,Default,,0,0,0,,ΥΠΟΤΙΤΛΟΙ ΔΕΝ ΔΗΜΙΟΥΡΓΗΘΗΚΑΝ
+"""
+        
+        with open(SUBS_FILE, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+        
+        return
     
     # Process audio
     words = []
-    while True:
-        data = wf.readframes(4000)
-        if len(data) == 0:
-            break
-        if rec.AcceptWaveform(data):
-            result = json.loads(rec.Result())
-            if 'result' in result:
-                for word_info in result['result']:
-                    words.append({
-                        'word': word_info['word'].upper(),
-                        'start': word_info['start'],
-                        'end': word_info['end']
-                    })
-    
-    # Final result
-    final_result = json.loads(rec.FinalResult())
-    if 'result' in final_result:
-        for word_info in final_result['result']:
-            words.append({
-                'word': word_info['word'].upper(),
-                'start': word_info['start'],
-                'end': word_info['end']
-            })
+    try:
+        while True:
+            data = wf.readframes(4000)
+            if len(data) == 0:
+                break
+            if rec.AcceptWaveform(data):
+                result = json.loads(rec.Result())
+                if 'result' in result:
+                    for word_info in result['result']:
+                        words.append({
+                            'word': word_info['word'].upper(),
+                            'start': word_info['start'],
+                            'end': word_info['end']
+                        })
+        
+        # Final result
+        final_result = json.loads(rec.FinalResult())
+        if 'result' in final_result:
+            for word_info in final_result['result']:
+                words.append({
+                    'word': word_info['word'].upper(),
+                    'start': word_info['start'],
+                    'end': word_info['end']
+                })
+    except Exception as e:
+        print(f"[subs] ERROR: Failed during Vosk audio processing: {e}")
+        
+        # Create a basic ASS file as fallback
+        ass_content = """[Script Info]
+Title: Greek Story
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial Black,16,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,5,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,0,,ΕΠΕΞΕΡΓΑΣΙΑ ΛΟΓΟΥ ΑΠΕΤΥΧΕ
+Dialogue: 0,0:00:03.00,0:00:06.00,Default,,0,0,0,,ΥΠΟΤΙΤΛΟΙ ΔΕΝ ΔΗΜΙΟΥΡΓΗΘΗΚΑΝ
+Dialogue: 0,0:00:06.00,0:00:09.00,Default,,0,0,0,,ΕΛΕΓΞΤΕ ΤΗΝ ΔΙΑΔΙΚΑΣΙΑ
+"""
+        
+        with open(SUBS_FILE, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+        
+        return
+    finally:
+        wf.close()
     
     # Create ASS subtitle file
     ass_content = """[Script Info]
@@ -382,7 +554,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     with open(SUBS_FILE, "w", encoding="utf-8") as f:
         f.write(ass_content)
     
-    print(f"[subs] WORD-BY-WORD subtitles saved ({len(words)} words)")
+    print(f"[subs] WORD-BY-WORD Greek subtitles saved ({len(words)} words)")
+    
+    # Clean up temporary WAV file
+    if wav_file.exists():
+        wav_file.unlink()
+        print("[subs] Cleaned up temporary WAV file")
 
 def get_audio_duration(audio_file):
     """Get duration of audio file using ffprobe."""
