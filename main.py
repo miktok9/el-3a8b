@@ -17,7 +17,7 @@ load_dotenv()
 NUM_IMAGES = 8  # 8 unique scenes
 IMAGE_WIDTH = 1080
 IMAGE_HEIGHT = 1920
-IMAGE_MODEL = "klein" # FLUX.2 Klein 4B model
+IMAGE_MODEL = "flux" # FLUX.2 Klein 4B model
 POLLINATIONS_BASE_URL = "https://gen.pollinations.ai"
 
 STORY_MAX_WORDS = 130
@@ -536,3 +536,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
