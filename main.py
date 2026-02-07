@@ -17,7 +17,7 @@ load_dotenv()
 NUM_IMAGES = 8  # 8 unique scenes
 IMAGE_WIDTH = 1080
 IMAGE_HEIGHT = 1920
-IMAGE_MODEL = "flux" # Paid FLUX model
+IMAGE_MODEL = "klein" # FLUX.2 Klein 4B model
 POLLINATIONS_BASE_URL = "https://gen.pollinations.ai"
 
 STORY_MAX_WORDS = 130
@@ -182,7 +182,7 @@ def generate_image(scene: str, idx: int) -> Path:
     params = {
         "width": IMAGE_WIDTH,
         "height": IMAGE_HEIGHT,
-        "model": "flux",  # Paid flux model
+        "model": IMAGE_MODEL,  # Use configured model (e.g., klein)
         "seed": seed,
         "nologo": True,  # Explicitly request no watermarks
         "negative_prompt": "worst quality, blurry, watermark, logo, text, signature, branded content, inappropriate, revealing, suggestive, nude, sexual, violence, blood, gore, deformed, ugly, bad anatomy, bad proportions, distorted face, asymmetrical eyes"
