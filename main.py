@@ -14,10 +14,11 @@ load_dotenv()
 
 # ---------------- CONFIG ----------------
 
-NUM_IMAGES = 8  # 8 unique scenes (faster generation)
+NUM_IMAGES = 8  # 8 unique scenes
 IMAGE_WIDTH = 1080
 IMAGE_HEIGHT = 1920
-IMAGE_MODEL = "flux"
+IMAGE_MODEL = "flux" # Paid FLUX model
+POLLINATIONS_BASE_URL = "https://gen.pollinations.ai"
 
 STORY_MAX_WORDS = 130
 
@@ -50,10 +51,27 @@ def ensure_dirs():
         f.unlink()
 
 def choose_topic_for_today():
+    """Pick the first topic from the list and remove it to prevent repetition."""
+    if not Path(TOPICS_FILE).exists():
+        return "Ιστορία των Γυναικών στην Αρχαιότητα"
+        
     with open(TOPICS_FILE, "r", encoding="utf-8") as f:
         topics = [line.strip() for line in f if line.strip()]
-    today = datetime.date.today()
-    return topics[today.toordinal() % len(topics)]
+        
+    if not topics:
+        return "Ιστορία των Γυναικών στην Αρχαιότητα"
+        
+    # Take the first topic
+    chosen_topic = topics[0]
+    remaining_topics = topics[1:]
+    
+    # Save the remaining topics back to the file
+    with open(TOPICS_FILE, "w", encoding="utf-8") as f:
+        for t in remaining_topics:
+            f.write(t + "\n")
+            
+    print(f"[topics] Chosen topic: {chosen_topic}. Remaining: {len(remaining_topics)}")
+    return chosen_topic
 
 def generate_story_with_pollinations(topic: str) -> str:
     """Generate a short Greek story about ancient women's history using paid Pollinations API."""
@@ -69,19 +87,27 @@ def generate_story_with_pollinations(topic: str) -> str:
     )
     prompt = f"Θέμα: {topic}. Διηγήσου ένα ενδιαφέρον ιστορικό γεγονός."
 
-    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    params = {
-        "model": "nova-fast",
-        "temperature": 1.0,
-        "system": system,
-        "json": False
+    # Using the standardized chat completion endpoint for paid API
+    url = f"{POLLINATIONS_BASE_URL}/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "openai", # High quality text model
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.8
     }
 
     print(f"[story] Generating Greek story for topic: {topic}")
-    r = requests.get(url, headers=headers, params=params, timeout=60)
+    r = requests.post(url, headers=headers, json=payload, timeout=60)
     r.raise_for_status()
-    text = r.text.strip()
+    
+    response_json = r.json()
+    text = response_json['choices'][0]['message']['content'].strip()
 
     words = text.split()
     if len(words) > STORY_MAX_WORDS:
@@ -138,30 +164,28 @@ def generate_image(scene: str, idx: int) -> Path:
     
     # Build high-quality photorealistic prompt focusing on beautiful ancient women
     prompt = (
-        f"stunning beautifully dressed woman from ancient civilization, {scene}, "
-        f"hyper-realistic portrait, extremely detailed facial features, "
-        f"intricate traditional ancient clothing with rich textures, "
-        f"professional studio lighting, dramatic shadows and highlights, "
-        f"RAW photography, photorealistic, 8K resolution, ultra-high detail, "
-        f"sharp focus, depth of field, bokeh, cinematic composition, "
-        f"masterpiece, award-winning photography, volumetric lighting, "
-        f"hyper-detailed skin texture, realistic eyes with catchlights, "
-        f"museum quality art, historical accuracy, elegant and graceful pose, "
-        f"appropriate for all audiences, clean and tasteful"
+        f"stunningly beautiful and photorealistic woman from ancient civilization, {scene}, "
+        f"extreme close-up portrait, mathematically perfect facial features, "
+        f"soulful expressive eyes, hyper-realistic skin texture, "
+        f"intricate traditional ancient jewelry and clothing with gold embroidery, "
+        f"cinematic lighting by a professional photographer, soft shadows, "
+        f"shot on 35mm lens, f/1.8, RAW photo, 8K UHD, lifelike, breathtaking beauty, "
+        f"historically inspired elegance, museum-level details, "
+        f"highly detailed face and hair, professional color grading"
     )
     safe_prompt = quote(prompt)
     
-    # Build URL with enhanced parameters for photorealism and safety
-    url = f"https://image.pollinations.ai/prompt/{safe_prompt}"
-    headers = {"Authorization": f"Bearer {os.getenv('POLLINATIONS_API_KEY')}"}
+    # Build URL for paid image generation
+    url = f"{POLLINATIONS_BASE_URL}/image/{safe_prompt}"
+    api_key = os.getenv("POLLINATIONS_API_KEY")
+    headers = {"Authorization": f"Bearer {api_key}"}
     params = {
         "width": IMAGE_WIDTH,
         "height": IMAGE_HEIGHT,
-        "model": "flux",  # Use flux model
+        "model": "flux",  # Paid flux model
         "seed": seed,
-        "safe": True,  # Enable strict content filtering to prevent NSFW (boolean)
         "nologo": True,  # Explicitly request no watermarks
-        "negative_prompt": "worst quality, blurry, watermark, logo, text, signature, branded content, inappropriate, revealing, suggestive, nude, sexual, violence, blood, gore"
+        "negative_prompt": "worst quality, blurry, watermark, logo, text, signature, branded content, inappropriate, revealing, suggestive, nude, sexual, violence, blood, gore, deformed, ugly, bad anatomy, bad proportions, distorted face, asymmetrical eyes"
     }
 
     out = IMAGES_DIR / f"scene_{idx:02d}.jpg"
@@ -221,7 +245,7 @@ def generate_tts(story: str):
     
     print("[tts] Generating Greek narration with edge-tts...")
     
-    VOICE = "el-GR-NestorasNeural"  # Greek male voice (or use "el-GR-AthinaNeural" for female)
+    VOICE = "el-GR-AthinaNeural"  # Greek female voice 
     
     async def generate():
         communicate = edge_tts.Communicate(story, VOICE)

@@ -2,8 +2,8 @@
 Generate new Greek topics using AI when topics.txt runs low.
 
 This script:
-1. Checks if topics.txt has enough topics (< 500 remaining)
-2. Generates 100 new unique Greek topics using Pollinations AI
+1. Checks if topics.txt has enough topics (< 50 remaining)
+2. Generates 100 new unique Greek topics using Pollinations API
 3. Appends them to topics.txt
 """
 
@@ -35,13 +35,19 @@ def generate_new_topics(count=100):
     
     prompt = f"Δημιούργησε {count} μοναδικά θέματα για γυναίκες σε αρχαίους πολιτισμούς"
     
-    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    params = {
-        "model": "nova-fast",
-        "temperature": 0.9,
-        "system": system,
-        "json": False
+    # Using the standardized chat completion endpoint for paid API
+    url = "https://gen.pollinations.ai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "openai",
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.8
     }
     
     print(f"[topics] Generating {count} new Greek topics...")
@@ -50,12 +56,15 @@ def generate_new_topics(count=100):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            r = requests.get(url, headers=headers, params=params, timeout=120)
+            r = requests.post(url, headers=headers, json=payload, timeout=120)
             r.raise_for_status()
             
             # Parse topics
+            response_json = r.json()
+            text = response_json['choices'][0]['message']['content'].strip()
+            
             topics = []
-            for line in r.text.strip().split('\n'):
+            for line in text.split('\n'):
                 # Remove numbering and clean
                 cleaned = line.strip()
                 # Remove common prefixes
