@@ -1,4 +1,4 @@
-"""
+﻿"""
 YouTube Upload Script - Updated for 2025
 
 Uses refresh token from GitHub Secrets to upload videos.
@@ -45,6 +45,15 @@ def get_authenticated_service():
 
 def upload_to_youtube(video_file, title, description, tags, category_id='22'):
     """Upload video to YouTube and return result."""
+    if not title:
+        title = "Shorts"
+    title = title.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    title = " ".join(title.split())
+    title = title.strip("|-–— ")
+    if len(title) > 100:
+        title = title[:97] + "..."
+    if not title or len(title.strip()) < 2:
+        title = "Shorts"
     youtube = get_authenticated_service()
     
     body = {
@@ -83,7 +92,7 @@ def upload_to_youtube(video_file, title, description, tags, category_id='22'):
         if status:
             print(f"[youtube] Progress: {int(status.progress() * 100)}%")
     
-    print(f"[youtube] ✅ Uploaded! Video ID: {response['id']}")
+    print(f"[youtube] âœ… Uploaded! Video ID: {response['id']}")
     print(f"[youtube] URL: https://youtube.com/shorts/{response['id']}")
     return {'status': 'success', 'id': response['id'], 'platform': 'youtube', 'link': f"https://youtube.com/shorts/{response['id']}"}
 
@@ -92,7 +101,7 @@ def main():
     video_file = Path('output/final_video.mp4')
     
     if not video_file.exists():
-        print("[youtube] ❌ No video found at output/final_video.mp4")
+        print("[youtube] âŒ No video found at output/final_video.mp4")
         return
     
     # Read the story and topic for title
@@ -108,14 +117,14 @@ def main():
         # Create short, catchy title (max 60 chars for mobile)
         title = first_sentence[:57] + "..." if len(first_sentence) > 60 else first_sentence
     else:
-        title = "Ιστορία των Γυναικών στην Αρχαιότητα"
+        title = "Î™ÏƒÏ„Î¿ÏÎ¯Î± Ï„Ï‰Î½ Î“Ï…Î½Î±Î¹ÎºÏŽÎ½ ÏƒÏ„Î·Î½ Î‘ÏÏ‡Î±Î¹ÏŒÏ„Î·Ï„Î±"
     
     # NO description for Shorts (as requested)
-    description = "#Shorts #ΙστορίαΓυναικών #ΑρχαίαΙστορία"
+    description = "#Shorts #Î™ÏƒÏ„Î¿ÏÎ¯Î±Î“Ï…Î½Î±Î¹ÎºÏŽÎ½ #Î‘ÏÏ‡Î±Î¯Î±Î™ÏƒÏ„Î¿ÏÎ¯Î±"
     
     tags = [
-        'Ιστορία', 'Αρχαίες Γυναίκες', 'Ιστορικά Γεγονότα',
-        'Shorts', 'AI', 'Εκπαίδευση', 'Αρχαίος Κόσμος'
+        'Î™ÏƒÏ„Î¿ÏÎ¯Î±', 'Î‘ÏÏ‡Î±Î¯ÎµÏ‚ Î“Ï…Î½Î±Î¯ÎºÎµÏ‚', 'Î™ÏƒÏ„Î¿ÏÎ¹ÎºÎ¬ Î“ÎµÎ³Î¿Î½ÏŒÏ„Î±',
+        'Shorts', 'AI', 'Î•ÎºÏ€Î±Î¯Î´ÎµÏ…ÏƒÎ·', 'Î‘ÏÏ‡Î±Î¯Î¿Ï‚ ÎšÏŒÏƒÎ¼Î¿Ï‚'
     ]
     
     # Upload
@@ -128,7 +137,7 @@ def main():
             category_id='22'
         )
     except Exception as e:
-        print(f"[youtube] ❌ Upload failed: {e}")
+        print(f"[youtube] âŒ Upload failed: {e}")
         raise
 
 if __name__ == '__main__':
