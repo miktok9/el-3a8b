@@ -2,10 +2,7 @@ name: Daily Auto Shorts with Multi-Platform Upload
 
 on:
   schedule:
-    - cron: "18 7 * * *"
-    - cron: "3 12 * * *"
-    - cron: "49 16 * * *"
-    - cron: "26 23 * * *"
+    - cron: "35 6 * * *"      # 9:35 AM Greece (UTC+3) - Once daily
   workflow_dispatch:
 
 permissions:
@@ -43,13 +40,13 @@ jobs:
 
     - name: Check and generate topics if needed
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
       run: |
         python generate_topics.py
 
     - name: Generate daily short video
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
         GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
         GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
       run: |
@@ -57,7 +54,7 @@ jobs:
 
     - name: Upload to all platforms
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
         YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
         YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
         YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}

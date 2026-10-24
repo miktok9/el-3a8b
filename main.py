@@ -78,67 +78,99 @@ def choose_topic_for_today():
         used = set()
         open(used_file, "w", encoding="utf-8").close()
     selected_topic = random.choice(remaining)
+    selected_topic = selected_topic.replace(" and ", " και ").strip()
     with open(used_file, "a", encoding="utf-8") as f:
         f.write(f"{datetime.date.today()}: {selected_topic}\n")
+    with open(OUTPUT_DIR / "topic.txt", "w", encoding="utf-8") as f:
+        f.write(selected_topic)
     print(f"[topics] Selected: {selected_topic} (pool={len(all_topics)}, used={len(used)})")
     return selected_topic
 
 
+def is_valid_story(content: str) -> bool:
+    if not content or len(content.strip()) < 30:
+        return False
+    lower = content.lower()
+    error_keywords = ["credit", "top up", "top-up", "pollinations", "api key", "balance", "rate limit", "error", "unauthorized", "quota"]
+    return not any(kw in lower for kw in error_keywords)
+
 def generate_story_with_pollinations(topic: str) -> str:
-    """Generate story using Pollinations AI."""
-    api_key = os.getenv("POLLINATIONS_API_KEY")
-    if not api_key:
-        raise ValueError("POLLINATIONS_API_KEY required")
-    url = "https://gen.pollinations.ai/v1/chat/completions"
+    """Generate Greek story using Pollinations AI with validation and multi-endpoint fallback."""
+    api_key = os.getenv("POLLINATIONS_API_KEY") or "sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ"
+    endpoints = [
+        "https://gen.pollinations.ai/v1/chat/completions",
+        "https://text.pollinations.ai/openai/chat/completions"
+    ]
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     system = "You are a historian specializing in ancient women history. Write a short 30-second interesting story (80-130 words) in Greek. Tell real historical facts, laws, customs, or traditions. Use a lively, captivating style. No titles."
     prompt = f"Theme: {topic}. Tell an interesting historical fact in Greek."
     payload = {"model": "openai", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "temperature": 0.8}
-    print(f"[story] Generating story for topic: {topic}")
-    for attempt in range(3):
+    print(f"[story] Generating Greek story for topic: {topic}")
+    
+    text = None
+    for attempt in range(4):
+        ep = endpoints[attempt % len(endpoints)]
         try:
-            r = requests.post(url, headers=headers, json=payload, timeout=60)
-            r.raise_for_status()
-            break
+            r = requests.post(ep, headers=headers, json=payload, timeout=60)
+            if r.status_code == 200:
+                candidate = r.json()["choices"][0]["message"]["content"].strip()
+                if is_valid_story(candidate):
+                    text = candidate
+                    break
+                else:
+                    print(f"[story] Response from {ep} contained error or credit message: {candidate[:60]}...")
+            else:
+                print(f"[story] Attempt {attempt+1} on {ep} status {r.status_code}")
         except Exception as e:
-            print(f"[story] Attempt {attempt+1} failed: {e}")
-            if attempt < 2:
-                time.sleep((attempt+1)*10)
-    else:
-        print(f"[story] WARNING: API unavailable, using fallback story")
-        return f"Πριν από πολύ καιρό, στον αρχαίο κόσμο, οι γυναίκες διαμόρφωναν νόμους, έθιμα και την καθημερινή ζωή με αξιοσημείωτους τρόπους. {topic}. Οι ιστορίες τους για θάρρος, επιδεξιότητα και ανθεκτικότητα αντηχούν στην ιστορία και μας εμπνέουν ακόμα και σήμερα."
-    text = r.json()["choices"][0]["message"]["content"].strip()
+            print(f"[story] Attempt {attempt+1} on {ep} failed: {e}")
+        time.sleep(5)
+    
+    if not text:
+        print("[story] ⚠️ Using curated Greek historical fallback story...")
+        text = f"Στον αρχαίο κόσμο, οι γυναίκες διαμόρφωναν νόμους, έθιμα και την καθημερινή ζωή με αξιοσημείωτους τρόπους. {topic}. Οι ιστορίες τους για θάρρος, επιδεξιότητα και ανθεκτικότητα αντηχούν στην ιστορία και μας εμπνέουν ακόμα και σήμερα."
+        
     words = text.split()
     if len(words) > STORY_MAX_WORDS:
         text = " ".join(words[:STORY_MAX_WORDS])
     with open(STORY_FILE, "w", encoding="utf-8") as f:
         f.write(text)
-    print(f"[story] Story generated ({len(text.split())} words)")
+    print(f"[story] Greek story generated ({len(text.split())} words)")
     return text
 def generate_english_story(topic: str) -> str:
-    """Generate English story using Pollinations AI."""
-    api_key = os.getenv("POLLINATIONS_API_KEY")
-    if not api_key:
-        raise ValueError("POLLINATIONS_API_KEY required")
-    url = "https://gen.pollinations.ai/v1/chat/completions"
+    """Generate English story using Pollinations AI with validation and multi-endpoint fallback."""
+    api_key = os.getenv("POLLINATIONS_API_KEY") or "sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ"
+    endpoints = [
+        "https://gen.pollinations.ai/v1/chat/completions",
+        "https://text.pollinations.ai/openai/chat/completions"
+    ]
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     system = "You are a historian specialized in ancient women history. Write a short 30-second interesting story (80-130 words) in English. Tell real historical facts, laws, customs, or traditions. Use a lively, captivating style. No titles."
     prompt = f"Theme: {topic}. Tell an interesting historical fact in English."
     payload = {"model": "openai", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "temperature": 0.8}
     print(f"[story] Generating English story for topic: {topic}")
-    for attempt in range(3):
+    
+    text = None
+    for attempt in range(4):
+        ep = endpoints[attempt % len(endpoints)]
         try:
-            r = requests.post(url, headers=headers, json=payload, timeout=60)
-            r.raise_for_status()
-            break
+            r = requests.post(ep, headers=headers, json=payload, timeout=60)
+            if r.status_code == 200:
+                candidate = r.json()["choices"][0]["message"]["content"].strip()
+                if is_valid_story(candidate):
+                    text = candidate
+                    break
+                else:
+                    print(f"[story] Response from {ep} contained error or credit message: {candidate[:60]}...")
+            else:
+                print(f"[story] Attempt {attempt+1} on {ep} status {r.status_code}")
         except Exception as e:
-            print(f"[story] Attempt {attempt+1} failed: {e}")
-            if attempt < 2:
-                time.sleep((attempt+1)*10)
-    else:
-        print(f"[story] WARNING: API unavailable, using fallback English story")
-        return f"Long ago, in the ancient world, women shaped laws, customs and daily life in remarkable ways. {topic}. Their stories of courage, skill and resilience echo through history and still inspire us today."
-    text = r.json()["choices"][0]["message"]["content"].strip()
+            print(f"[story] Attempt {attempt+1} on {ep} failed: {e}")
+        time.sleep(5)
+        
+    if not text:
+        print("[story] ⚠️ Using curated English historical fallback story...")
+        text = f"Long ago, in the ancient world, women shaped laws, customs and daily life in remarkable ways. {topic}. Their stories of courage, skill and resilience echo through history and still inspire us today."
+        
     words = text.split()
     if len(words) > STORY_MAX_WORDS:
         text = " ".join(words[:STORY_MAX_WORDS])

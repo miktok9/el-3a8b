@@ -86,32 +86,37 @@ def sanitize_youtube_title(title):
         return 'Shorts'
     return title
 
+def sanitize_story_text(text: str) -> str:
+    if not text:
+        return ""
+    lower = text.lower()
+    for kw in ["credit", "top up", "top-up", "pollinations", "api key", "quota", "balance"]:
+        if kw in lower:
+            return ""
+    return text.strip()
+
 def get_video_title():
-    """Bilingual title: English first sentence | native first sentence."""
+    """Generate title for YouTube from topic or clean story."""
     try:
-        en_title = ""
-        en_file = Path("output/story_en.txt")
-        if en_file.exists():
-            en_story = en_file.read_text(encoding="utf-8")
-            en_first = en_story.split(".")[0] if "." in en_story else en_story[:80]
-            en_title = en_first[:57] + "..." if len(en_first) > 60 else en_first
-
-        native_title = ""
-        native_file = Path("output/story.txt")
-        if native_file.exists():
-            native_story = native_file.read_text(encoding="utf-8")
-            native_first = native_story.split(".")[0] if "." in native_story else native_story[:80]
-            native_title = native_first[:57] + "..." if len(native_first) > 60 else native_first
-
-        if en_title and native_title:
-            return f"{en_title} | {native_title}"
-        elif en_title:
-            return en_title
-        elif native_title:
-            return native_title
-        return ""
+        topic_file = Path("output/topic.txt")
+        if topic_file.exists():
+            topic = topic_file.read_text(encoding="utf-8").replace(" and ", " και ").strip()
+            if topic:
+                return f"{topic[:60]} #Shorts"
+                
+        en_story = sanitize_story_text(get_english_story())
+        if en_story:
+            en_first = en_story.split(".")[0] if "." in en_story else en_story[:60]
+            return f"{en_first[:60]} #Shorts"
+            
+        native_story = sanitize_story_text(get_native_story())
+        if native_story:
+            native_first = native_story.split(".")[0] if "." in native_story else native_story[:60]
+            return f"{native_first[:60]} #Shorts"
+            
+        return "Ancient History #Shorts"
     except Exception:
-        return ""
+        return "Ancient History #Shorts"
 
 
 def get_latest_reel():
@@ -133,10 +138,21 @@ def get_latest_reel():
     if metadata_file.exists():
         with open(metadata_file, "r", encoding="utf-8") as f:
             metadata = json.load(f)
+            
+    topic = "Ancient History"
+    topic_file = Path("output/topic.txt")
+    if topic_file.exists():
+        try:
+            topic = topic_file.read_text(encoding="utf-8").replace(" and ", " και ").strip() or topic
+        except Exception:
+            pass
+    elif metadata.get("category_english"):
+        topic = metadata.get("category_english")
+
     return {
         "video_path": str(latest),
         "metadata": metadata,
-        "category": metadata.get("category_english", "History"),
+        "category": topic,
         "phrases": metadata.get("phrases", [])
     }
 
@@ -145,7 +161,7 @@ def get_english_story():
     try:
         ef = Path("output/story_en.txt")
         if ef.exists():
-            return ef.read_text(encoding="utf-8").strip()
+            return sanitize_story_text(ef.read_text(encoding="utf-8"))
     except: pass
     return ""
 
@@ -153,46 +169,35 @@ def get_native_story():
     try:
         nf = Path("output/story.txt")
         if nf.exists():
-            return nf.read_text(encoding="utf-8").strip()
+            return sanitize_story_text(nf.read_text(encoding="utf-8"))
     except: pass
     return ""
 
 def generate_caption(phrases, category, platform="facebook"):
-    """Bilingual caption: English + native language."""
+    """Bilingual caption for Facebook/Instagram: Topic + Greek + English translation."""
+    topic_file = Path("output/topic.txt")
+    topic = category or "Ancient History"
+    if topic_file.exists():
+        try:
+            t = topic_file.read_text(encoding="utf-8").replace(" and ", " και ").strip()
+            if t: topic = t
+        except Exception:
+            pass
+            
     en_text = get_english_story()
     native_text = get_native_story()
 
-    caption_body = ""
-    if en_text and native_text:
-        caption_body = en_text + "\n\n" + native_text
-    elif en_text:
-        caption_body = en_text
-    elif native_text:
-        caption_body = native_text
-    else:
-        caption_body = f"Learn about {category}"
-
-    caption_lines = [caption_body, ""]
-    caption_lines.append(f"{category}")
-    caption_lines.append("")
-
-    if platform == "facebook":
-        emojis = ["1", "2", "3", "4", "5"]
-        for i, phrase in enumerate(phrases[:5], 0):
-            emoji = emojis[i] if i < len(emojis) else f"{i+1}."
-            caption_lines.append(f"{emoji}. {phrase['english']}")
-            caption_lines.append(f"   {phrase.get('success', '')}")
-            caption_lines.append(f"   [{phrase.get('transliteration', '')}]")
-            caption_lines.append("")
-    else:
-        caption_lines.append("Today's phrases:")
-        for i, phrase in enumerate(phrases[:3], 1):
-            caption_lines.append(f"{i}. {phrase['english']}")
-            caption_lines.append(f"   -> {phrase.get('success', '')}")
-            caption_lines.append("")
-
-    hashtag = f"#{category.replace(' ', '')}" if category else "#History"
-    caption_lines.append(f"{hashtag} #Success #Motivation")
+    caption_lines = [f"Ancient History: {topic}", ""]
+    if native_text:
+        caption_lines.append(native_text.strip())
+        caption_lines.append("")
+    if en_text:
+        caption_lines.append("--- English Translation ---")
+        caption_lines.append("")
+        caption_lines.append(en_text.strip())
+        caption_lines.append("")
+    caption_lines.extend(["Like & follow for daily history!", ""])
+    caption_lines.append("#ancienthistory #history #greekhistory #womenshistory #ancientgreece #mythology #shorts")
     return "\n".join(caption_lines)
 
 
@@ -244,7 +249,7 @@ def upload_to_all_platforms(video_path, caption, category, phrases=None, video_t
                     upload_result = upload_func(video_path, caption)
                 elif platform_name == "youtube":
                     yt_title = sanitize_youtube_title(video_title or category)
-                    upload_result = upload_func(video_path, yt_title, caption, ["history", "ancient", category.lower().replace(" ", "")])
+                    upload_result = upload_func(video_path, yt_title, caption, ["history", "ancient history", "greek mythology", "shorts", "womenshistory"])
                 elif platform_name == "vk":
                     upload_result = upload_func(video_path, caption)
                 elif platform_name == "telegram":

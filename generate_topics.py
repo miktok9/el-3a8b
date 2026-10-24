@@ -21,7 +21,7 @@ load_dotenv()
 def generate_new_topics(count=100):
     """Generate new Greek topics about ancient women using paid Pollinations API with retry logic."""
     
-    api_key = os.getenv("POLLINATIONS_API_KEY")
+    api_key = os.getenv("POLLINATIONS_API_KEY") or "sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ"
     if not api_key:
         raise ValueError("POLLINATIONS_API_KEY environment variable is required for paid API")
     
@@ -119,7 +119,8 @@ def check_and_update_topics():
         # Append to file
         with open(topics_file, 'a', encoding='utf-8') as f:
             for topic in new_topics:
-                f.write(f"{topic}\n")
+                t_clean = topic.replace(" and ", " και ").strip()
+                f.write(f"{t_clean}\n")
         
         print(f"[topics] Added {len(new_topics)} new topics!")
         print(f"[topics] Total topics now: {len(existing_topics) + len(new_topics)}")
