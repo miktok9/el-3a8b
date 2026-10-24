@@ -273,8 +273,15 @@ def generate_tts(story: str):
     
     VOICE = "el-GR-AthinaNeural"  # Greek female voice 
     
+    # Clean text to remove any symbols, brackets, or URLs
+    clean_text = re.sub(r'https?://\S+', '', story)
+    clean_text = re.sub(r'[*_#\[\]\(\)<>]', '', clean_text)
+    clean_text = clean_text.replace('&', 'και')
+    clean_text = " ".join(clean_text.split())
+    
     async def generate():
-        communicate = edge_tts.Communicate(story, VOICE)
+        # -8% speed rate produces natural, calm, articulate storytelling
+        communicate = edge_tts.Communicate(clean_text, VOICE, rate="-8%")
         await communicate.save(str(NARRATION_FILE))
     
     asyncio.run(generate())
