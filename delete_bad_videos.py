@@ -26,25 +26,14 @@ def get_authenticated_service():
 
 def main():
     print("=" * 60)
-    print("YOUTUBE BAD VIDEO CLEANUP")
+    print("YOUTUBE BAD VIDEO CLEANUP - FULL SCAN")
     print("=" * 60)
     yt = get_authenticated_service()
     if not yt:
         print("[delete] Cannot authenticate to YouTube API.")
         return
         
-    known_bad_ids = ["nq6-lKRMSxc"]
-    
-    # 1. Directly delete known bad video IDs
-    for vid in known_bad_ids:
-        try:
-            print(f"[delete] Attempting to delete specific video ID: {vid}...")
-            yt.videos().delete(id=vid).execute()
-            print(f"[delete] ✅ SUCCESS: Deleted video {vid}")
-        except Exception as e:
-            print(f"[delete] Notice for {vid}: {e}")
-            
-    # 2. Scan recent uploads for any video containing error keywords in title/description
+    # 1. Scan channel uploads with pagination
     try:
         channels_res = yt.channels().list(mine=True, part='contentDetails').execute()
         items = channels_res.get('items', [])
@@ -53,24 +42,46 @@ def main():
             return
             
         uploads_playlist = items[0]['contentDetails']['relatedPlaylists']['uploads']
-        playlist_items = yt.playlistItems().list(playlistId=uploads_playlist, part='snippet', maxResults=30).execute()
+        page_token = None
+        total_scanned = 0
+        total_deleted = 0
         
-        error_terms = ["credit", "top up", "top-up", "pollinations", "api key", "doesn't have enough"]
+        error_terms = [
+            "credit", "top up", "top-up", "pollinations", "api key",
+            "doesn't have enough", "account behind", "quest", "quota"
+        ]
         
-        for p_item in playlist_items.get('items', []):
-            vid = p_item['snippet']['resourceId']['videoId']
-            title = p_item['snippet']['title']
-            desc = p_item['snippet']['description']
-            combined = (title + " " + desc).lower()
+        while True:
+            playlist_items = yt.playlistItems().list(
+                playlistId=uploads_playlist,
+                part='snippet',
+                maxResults=50,
+                pageToken=page_token
+            ).execute()
             
-            if any(term in combined for term in error_terms):
-                print(f"[delete] Found bad video: '{title}' (ID: {vid})")
-                try:
-                    yt.videos().delete(id=vid).execute()
-                    print(f"[delete] ✅ SUCCESS: Deleted bad video {vid} ('{title}')")
-                except Exception as ex:
-                    print(f"[delete] ❌ Failed to delete {vid}: {ex}")
-                    
+            p_items = playlist_items.get('items', [])
+            total_scanned += len(p_items)
+            
+            for p_item in p_items:
+                vid = p_item['snippet']['resourceId']['videoId']
+                title = p_item['snippet']['title']
+                desc = p_item['snippet']['description']
+                combined = (title + " " + desc).lower()
+                
+                if any(term in combined for term in error_terms):
+                    print(f"[delete] Found bad video: '{title[:60]}' (ID: {vid})")
+                    try:
+                        yt.videos().delete(id=vid).execute()
+                        total_deleted += 1
+                        print(f"[delete] ✅ SUCCESS: Deleted bad video {vid}")
+                    except Exception as ex:
+                        print(f"[delete] ❌ Failed to delete {vid}: {ex}")
+            
+            page_token = playlist_items.get('nextPageToken')
+            if not page_token:
+                break
+                
+        print(f"[delete] Scan completed. Scanned: {total_scanned} videos, Deleted: {total_deleted} bad videos.")
     except Exception as e:
         print(f"[delete] Error scanning channel uploads: {e}")
 

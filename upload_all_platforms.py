@@ -1,11 +1,11 @@
-﻿"""
-Uploads generated reels to all connected social media platforms
+"""
+Uploads generated shorts to YouTube
 """
 
 import os
 import sys
 import json
-import requests
+import re
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -16,6 +16,7 @@ upload_dir = Path(__file__).parent / "upload"
 if upload_dir.exists() and str(upload_dir) not in sys.path:
     sys.path.insert(0, str(upload_dir))
 
+# Facebook upload permanently disabled per user instruction
 upload_to_facebook = None
 upload_to_instagram = None
 upload_to_youtube = None
@@ -26,97 +27,74 @@ upload_to_threads = None
 upload_to_tiktok = None
 
 try:
-    from upload_facebook import upload_to_facebook as fb_upload
-    upload_to_facebook = fb_upload
-except ImportError as e:
-    print(f"[!] Facebook upload module not available: {e}")
-
-try:
-    from upload_instagram import upload_to_instagram as ig_upload
-    upload_to_instagram = ig_upload
-except ImportError as e:
-    print(f"[!] Instagram upload module not available: {e}")
-
-try:
     from upload_to_youtube import upload_to_youtube as yt_upload
     upload_to_youtube = yt_upload
 except ImportError as e:
     print(f"[!] YouTube upload module not available: {e}")
 
-try:
-    from upload_vk import upload_to_vk as vk_upload
-    upload_to_vk = vk_upload
-except ImportError as e:
-    print(f"[!] VK upload module not available: {e}")
 
-try:
-    from upload_telegram import upload_to_telegram as tg_upload
-    upload_to_telegram = tg_upload
-except ImportError as e:
-    print(f"[!] Telegram upload module not available: {e}")
+def is_valid_text(text: str) -> bool:
+    """Validate that text is clean historical content and not an API error or garbage."""
+    if not text or len(text.strip()) < 10:
+        return False
+    lower = text.lower()
+    error_keywords = [
+        "credit", "credits", "top up", "top-up", "pollinations", "api key",
+        "balance", "rate limit", "error", "unauthorized", "quota", "billing",
+        "quest", "account behind", "tokens", "http", "402", "429", "insufficient",
+        "service you're using", "service youre using"
+    ]
+    return not any(kw in lower for kw in error_keywords)
 
-try:
-    from upload_twitter import upload_to_twitter as tw_upload
-    upload_to_twitter = tw_upload
-except ImportError as e:
-    print(f"[!] Twitter upload module not available: {e}")
-
-try:
-    from upload_threads import upload_to_threads as th_upload
-    upload_to_threads = th_upload
-except ImportError as e:
-    print(f"[!] Threads upload module not available: {e}")
-
-try:
-    from upload_tiktok import upload_to_tiktok as tk_upload
-    upload_to_tiktok = tk_upload
-except ImportError as e:
-    print(f"[!] TikTok upload module not available: {e}")
-
-
-def sanitize_youtube_title(title):
-    if not title:
-        return 'Shorts'
-    title = title.replace(chr(10), ' ').replace(chr(13), ' ').replace(chr(9), ' ')
-    title = ' '.join(title.split())
-    title = title.strip('"|-–— ')
-    if len(title) > 100:
-        title = title[:97] + '...'
-    if not title or len(title.strip()) < 2:
-        return 'Shorts'
-    return title
 
 def sanitize_story_text(text: str) -> str:
     if not text:
         return ""
-    lower = text.lower()
-    for kw in ["credit", "top up", "top-up", "pollinations", "api key", "quota", "balance"]:
-        if kw in lower:
-            return ""
-    return text.strip()
+    if not is_valid_text(text):
+        return ""
+    # Strip any brackets, code fences, or URLs
+    cleaned = re.sub(r'https?://\S+', '', text)
+    cleaned = re.sub(r'[*_#\[\]\(\)<>]', '', cleaned)
+    return " ".join(cleaned.split()).strip()
 
-def get_video_title():
-    """Generate title for YouTube from topic or clean story."""
-    try:
-        topic_file = Path("output/topic.txt")
-        if topic_file.exists():
-            topic = topic_file.read_text(encoding="utf-8").replace(" and ", " και ").strip()
-            if topic:
-                return f"{topic[:60]} #Shorts"
-                
-        en_story = sanitize_story_text(get_english_story())
-        if en_story:
-            en_first = en_story.split(".")[0] if "." in en_story else en_story[:60]
-            return f"{en_first[:60]} #Shorts"
-            
-        native_story = sanitize_story_text(get_native_story())
-        if native_story:
-            native_first = native_story.split(".")[0] if "." in native_story else native_story[:60]
-            return f"{native_first[:60]} #Shorts"
-            
-        return "Ancient History #Shorts"
-    except Exception:
-        return "Ancient History #Shorts"
+
+def get_clean_topic() -> str:
+    """Retrieve and sanitize the current topic."""
+    topic = "Ancient History"
+    topic_file = Path("output/topic.txt")
+    if topic_file.exists():
+        try:
+            t = topic_file.read_text(encoding="utf-8").replace(" and ", " και ").strip()
+            if t and is_valid_text(t):
+                topic = t
+        except Exception:
+            pass
+    return topic
+
+
+def get_video_title() -> str:
+    """Generate a clean, high-impact YouTube Shorts title (max 100 chars, with #Shorts)."""
+    topic = get_clean_topic()
+    
+    # Clean whitespace and unwanted punctuation
+    clean_topic = re.sub(r'[\r\n\t]+', ' ', topic)
+    clean_topic = ' '.join(clean_topic.split()).strip('"-–—| ')
+    clean_topic = re.sub(r'[*_#\[\]\(\)]', '', clean_topic)
+    
+    branded_suffix = " | Ancient History #Shorts"
+    short_suffix = " #Shorts"
+    
+    if len(clean_topic) + len(branded_suffix) <= 100:
+        return f"{clean_topic}{branded_suffix}"
+    elif len(clean_topic) + len(short_suffix) <= 100:
+        return f"{clean_topic}{short_suffix}"
+    else:
+        # Truncate cleanly at last word boundary to avoid cutting words in half
+        max_allowed = 100 - len(short_suffix) - 3
+        truncated = clean_topic[:max_allowed]
+        if " " in truncated:
+            truncated = truncated.rsplit(" ", 1)[0]
+        return f"{truncated}...{short_suffix}"
 
 
 def get_latest_reel():
@@ -133,21 +111,17 @@ def get_latest_reel():
             print("No reels found in output/video directory")
             return None
         latest = max(reels, key=lambda p: p.stat().st_mtime)
+        
     metadata_file = latest.parent / "metadata.json"
     metadata = {}
     if metadata_file.exists():
-        with open(metadata_file, "r", encoding="utf-8") as f:
-            metadata = json.load(f)
-            
-    topic = "Ancient History"
-    topic_file = Path("output/topic.txt")
-    if topic_file.exists():
         try:
-            topic = topic_file.read_text(encoding="utf-8").replace(" and ", " και ").strip() or topic
+            with open(metadata_file, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
         except Exception:
             pass
-    elif metadata.get("category_english"):
-        topic = metadata.get("category_english")
+            
+    topic = get_clean_topic()
 
     return {
         "video_path": str(latest),
@@ -157,48 +131,64 @@ def get_latest_reel():
     }
 
 
-def get_english_story():
+def get_english_story() -> str:
     try:
         ef = Path("output/story_en.txt")
         if ef.exists():
             return sanitize_story_text(ef.read_text(encoding="utf-8"))
-    except: pass
+    except Exception:
+        pass
     return ""
 
-def get_native_story():
+
+def get_native_story() -> str:
     try:
         nf = Path("output/story.txt")
         if nf.exists():
             return sanitize_story_text(nf.read_text(encoding="utf-8"))
-    except: pass
+    except Exception:
+        pass
     return ""
 
-def generate_caption(phrases, category, platform="facebook"):
-    """Bilingual caption for Facebook/Instagram: Topic + Greek + English translation."""
-    topic_file = Path("output/topic.txt")
-    topic = category or "Ancient History"
-    if topic_file.exists():
-        try:
-            t = topic_file.read_text(encoding="utf-8").replace(" and ", " και ").strip()
-            if t: topic = t
-        except Exception:
-            pass
-            
-    en_text = get_english_story()
-    native_text = get_native_story()
 
-    caption_lines = [f"Ancient History: {topic}", ""]
-    if native_text:
-        caption_lines.append(native_text.strip())
-        caption_lines.append("")
-    if en_text:
-        caption_lines.append("--- English Translation ---")
-        caption_lines.append("")
-        caption_lines.append(en_text.strip())
-        caption_lines.append("")
-    caption_lines.extend(["Like & follow for daily history!", ""])
-    caption_lines.append("#ancienthistory #history #greekhistory #womenshistory #ancientgreece #mythology #shorts")
-    return "\n".join(caption_lines)
+def generate_caption(phrases=None, category="Ancient History", platform="youtube"):
+    """
+    Generate professional, informative bilingual YouTube description:
+    Topic + Greek Story + English Translation + Channel CTA + Hashtags.
+    """
+    topic = get_clean_topic()
+    native_text = get_native_story()
+    en_text = get_english_story()
+
+    lines = [
+        f"🏛️ {topic}",
+        ""
+    ]
+
+    if native_text and is_valid_text(native_text):
+        lines.append(native_text.strip())
+        lines.append("")
+    else:
+        lines.append(f"Μια συναρπαστική ιστορία από τον αρχαίο κόσμο για: {topic}. Οι παραδόσεις και τα ιστορικά γεγονότα που σημάδεψαν την αρχαία ιστορία.")
+        lines.append("")
+
+    if en_text and is_valid_text(en_text):
+        lines.append("📖 English Translation:")
+        lines.append(en_text.strip())
+        lines.append("")
+    else:
+        lines.append("📖 English Translation:")
+        lines.append(f"A fascinating glimpse into ancient history: {topic}. Discover the timeless legends and historical facts from the ancient world.")
+        lines.append("")
+
+    lines.extend([
+        "✨ Subscribe for daily stories from ancient history and mythology!",
+        "🔔 Turn on notifications so you never miss a daily Short.",
+        "",
+        "#Shorts #AncientHistory #History #GreekMythology #AncientGreece #Mythology #WomensHistory"
+    ])
+
+    return "\n".join(lines)
 
 
 def upload_to_all_platforms(video_path, caption, category, phrases=None, video_title=""):
@@ -214,26 +204,26 @@ def upload_to_all_platforms(video_path, caption, category, phrases=None, video_t
     }
 
     print("\n" + "=" * 80)
-    print("MULTI-PLATFORM UPLOAD")
+    print("YOUTUBE SHORTS UPLOAD")
     print("=" * 80)
     print(f"Video: {video_path}")
+    print(f"Title: {video_title}")
     print(f"Category: {category}")
-    print(f"Caption length: {len(caption)} characters")
+    print(f"Description length: {len(caption)} characters")
     print("=" * 80)
 
     if not Path(video_path).exists():
         print(f"[ERROR] Video file not found: {video_path}")
         return results
 
+    # Only YouTube is enabled per user requirements (Facebook strictly disabled)
     platforms = [
-        ("facebook", upload_to_facebook, "Facebook"),
-        ("instagram", upload_to_instagram, "Instagram"),
         ("youtube", upload_to_youtube, "YouTube"),
-        ("vk", upload_to_vk, "VK"),
-        ("telegram", upload_to_telegram, "Telegram"),
-        ("twitter", upload_to_twitter, "Twitter"),
-        ("threads", upload_to_threads, "Threads"),
-        ("tiktok", upload_to_tiktok, "TikTok"),
+    ]
+
+    tags = [
+        "Ancient History", "Greek Mythology", "Ιστορία", "Αρχαία Ελλάδα",
+        "Μυθολογία", "Shorts", "History", "Ancient Greece", "Womens History"
     ]
 
     for platform_name, upload_func, display_name in platforms:
@@ -242,24 +232,7 @@ def upload_to_all_platforms(video_path, caption, category, phrases=None, video_t
 
         if upload_func:
             try:
-                upload_result = None
-                if platform_name == "facebook":
-                    upload_result = upload_func(video_path, caption)
-                elif platform_name == "instagram":
-                    upload_result = upload_func(video_path, caption)
-                elif platform_name == "youtube":
-                    yt_title = sanitize_youtube_title(video_title or category)
-                    upload_result = upload_func(video_path, yt_title, caption, ["history", "ancient history", "greek mythology", "shorts", "womenshistory"])
-                elif platform_name == "vk":
-                    upload_result = upload_func(video_path, caption)
-                elif platform_name == "telegram":
-                    upload_result = upload_func(video_path, caption)
-                elif platform_name == "twitter":
-                    upload_result = upload_func(video_path, caption)
-                elif platform_name == "threads":
-                    upload_result = upload_func(video_path, caption)
-                elif platform_name == "tiktok":
-                    upload_result = upload_func(video_path, video_title or category, caption)
+                upload_result = upload_func(video_path, video_title, caption, tags)
                 if upload_result:
                     results["uploads"][platform_name] = upload_result
                     results["platforms_successful"].append(platform_name)
@@ -278,28 +251,16 @@ def upload_to_all_platforms(video_path, caption, category, phrases=None, video_t
     print("\n" + "=" * 60)
     print("UPLOAD STATUS REPORT")
     print("=" * 60)
-    report_order = [("FACEBOOK", "facebook"), ("INSTAGRAM", "instagram"), ("YOUTUBE", "youtube"),
-                    ("TIKTOK", "tiktok"), ("THREADS", "threads"), ("TWITTER", "twitter"),
-                    ("VK", "vk"), ("TELEGRAM", "telegram")]
-    for pname, pkey in report_order:
-        pinfo = results["uploads"].get(pkey, {})
-        if pinfo and pinfo.get("status") in ("success", "published"):
-            pid = pinfo.get("id", "N/A")
-            link = pinfo.get("link") or pinfo.get("url") or pinfo.get("post_url") or ""
-            if link:
-                print(f"{pname}: SUCCESS (ID: {pid}) LINK: {link}")
-            else:
-                print(f"{pname}: SUCCESS (ID: {pid})")
-        elif pinfo and pinfo.get("status") == "skipped":
-            print(f"{pname}: SKIPPED")
-        elif pinfo:
-            err = str(pinfo.get("error", ""))[:80]
-            print(f"{pname}: FAILED - {err}")
-        else:
-            pl = pkey.lower()
-            failed = pl in [p.lower() for p in results.get("platforms_failed", [])]
-            skipped = pl in [p.lower() for p in results.get("platforms_skipped", [])]
-            print(f"{pname}: {'FAILED' if failed else ('SKIPPED' if skipped else '-')}")
+    pinfo = results["uploads"].get("youtube", {})
+    if pinfo and pinfo.get("status") in ("success", "published"):
+        pid = pinfo.get("id", "N/A")
+        link = pinfo.get("link") or f"https://youtube.com/shorts/{pid}"
+        print(f"YOUTUBE: SUCCESS (ID: {pid}) LINK: {link}")
+    elif pinfo:
+        err = str(pinfo.get("error", ""))[:120]
+        print(f"YOUTUBE: FAILED - {err}")
+    else:
+        print("YOUTUBE: SKIPPED")
     print("=" * 60)
 
     results_file = Path("output") / f"upload_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -312,7 +273,7 @@ def upload_to_all_platforms(video_path, caption, category, phrases=None, video_t
 
 def main():
     print("\n" + "=" * 80)
-    print("AUTOMATED UPLOAD")
+    print("AUTOMATED YOUTUBE UPLOAD")
     print("=" * 80)
 
     reel = get_latest_reel()
@@ -325,30 +286,23 @@ def main():
     print(f"   Video: {reel['video_path']}")
     print(f"   Phrases: {len(reel['phrases'])}")
 
-    video_title = get_video_title() or reel["category"]
-    caption = generate_caption(reel['phrases'], reel['category'], platform="facebook")
-    print(f"\nGenerated caption ({len(caption)} chars):")
+    video_title = get_video_title()
+    caption = generate_caption(reel['phrases'], reel['category'], platform="youtube")
+    
+    print(f"\nGenerated Title: {video_title}")
+    print(f"Generated Description ({len(caption)} chars):")
     print("-" * 80)
-    print(caption[:500] + "..." if len(caption) > 500 else caption)
+    print(caption)
     print("-" * 80)
 
     results = upload_to_all_platforms(reel['video_path'], caption, reel['category'], reel['phrases'], video_title)
-    results["phrases"] = reel['phrases']
 
     successful = len(results.get("platforms_successful", []))
-    failed = len(results.get("platforms_failed", []))
-    skipped = len(results.get("platforms_skipped", []))
-
     if successful > 0:
-        print(f"\nUpload complete! {successful} platform(s) successful.")
-        if skipped > 0:
-            print(f"{skipped} platform(s) skipped - add credentials to enable them")
+        print(f"\nUpload complete! YouTube video successfully published.")
         sys.exit(0)
-    elif failed > 0:
-        print(f"\nAll attempted uploads failed ({failed} failed, {skipped} skipped).")
-        sys.exit(1)
     else:
-        print(f"\nAll uploads skipped ({skipped} skipped).")
+        print("\nYouTube upload failed.")
         sys.exit(1)
 
 

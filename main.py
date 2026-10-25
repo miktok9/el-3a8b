@@ -91,7 +91,12 @@ def is_valid_story(content: str) -> bool:
     if not content or len(content.strip()) < 30:
         return False
     lower = content.lower()
-    error_keywords = ["credit", "top up", "top-up", "pollinations", "api key", "balance", "rate limit", "error", "unauthorized", "quota"]
+    error_keywords = [
+        "credit", "credits", "top up", "top-up", "pollinations", "api key",
+        "balance", "rate limit", "error", "unauthorized", "quota", "billing",
+        "quest", "account behind", "tokens", "http", "402", "429", "insufficient",
+        "service you're using", "service youre using", "top-up?ref=", "quests?ref="
+    ]
     return not any(kw in lower for kw in error_keywords)
 
 def generate_story_with_pollinations(topic: str) -> str:
