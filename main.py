@@ -266,8 +266,9 @@ def generate_images(scenes: list):
     return [generate_image(scene, i) for i, scene in enumerate(scenes)]
 
 def generate_tts(story: str):
-    """Generate narration using edge-tts (free Microsoft TTS)."""
+    """Generate narration using edge-tts (free Microsoft TTS) with automatic retry and voice fallback."""
     import asyncio
+    import time
     try:
         import edge_tts
     except ImportError:
@@ -276,21 +277,35 @@ def generate_tts(story: str):
     
     print("[tts] Generating Greek narration with edge-tts...")
     
-    VOICE = "el-GR-AthinaNeural"  # Greek female voice 
-    
     # Clean text to remove any symbols, brackets, or URLs
     clean_text = re.sub(r'https?://\S+', '', story)
     clean_text = re.sub(r'[*_#\[\]\(\)<>]', '', clean_text)
     clean_text = clean_text.replace('&', 'και')
     clean_text = " ".join(clean_text.split())
     
-    async def generate():
-        # -8% speed rate produces natural, calm, articulate storytelling
-        communicate = edge_tts.Communicate(clean_text, VOICE, rate="-8%")
-        await communicate.save(str(NARRATION_FILE))
+    voices = ["el-GR-AthinaNeural", "el-GR-NestorasNeural"]
+    success = False
     
-    asyncio.run(generate())
-    print(f"[tts] Narration saved to {NARRATION_FILE}")
+    for attempt in range(4):
+        voice = voices[attempt % len(voices)]
+        try:
+            print(f"[tts] Attempt {attempt+1}: Generating audio using {voice}...")
+            async def generate():
+                communicate = edge_tts.Communicate(clean_text, voice, rate="-8%")
+                await communicate.save(str(NARRATION_FILE))
+            asyncio.run(generate())
+            if NARRATION_FILE.exists() and NARRATION_FILE.stat().st_size > 1000:
+                print(f"[tts] ✅ Narration saved to {NARRATION_FILE} ({NARRATION_FILE.stat().st_size} bytes)")
+                success = True
+                break
+            else:
+                print("[tts] ⚠️ Audio file empty or too small, retrying...")
+        except Exception as e:
+            print(f"[tts] ⚠️ Attempt {attempt+1} failed with voice {voice}: {e}")
+            time.sleep(2 * (attempt + 1))
+            
+    if not success:
+        raise RuntimeError(f"Failed to generate TTS narration after multiple attempts.")
 
 def generate_word_subtitles():
     """Generate WORD-BY-WORD subtitles using Vosk (lightweight!)."""
