@@ -101,7 +101,7 @@ def is_valid_story(content: str) -> bool:
 
 def generate_story_with_pollinations(topic: str) -> str:
     """Generate Greek story using Pollinations AI with validation and multi-endpoint fallback."""
-    api_key = os.getenv("POLLINATIONS_API_KEY") or "sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ"
+    api_key = os.getenv("POLLINATIONS_API_KEY")
     endpoints = [
         "https://gen.pollinations.ai/v1/chat/completions",
         "https://text.pollinations.ai/openai/chat/completions"
@@ -143,7 +143,7 @@ def generate_story_with_pollinations(topic: str) -> str:
     return text
 def generate_english_story(topic: str) -> str:
     """Generate English story using Pollinations AI with validation and multi-endpoint fallback."""
-    api_key = os.getenv("POLLINATIONS_API_KEY") or "sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ"
+    api_key = os.getenv("POLLINATIONS_API_KEY")
     endpoints = [
         "https://gen.pollinations.ai/v1/chat/completions",
         "https://text.pollinations.ai/openai/chat/completions"
